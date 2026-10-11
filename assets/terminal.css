@@ -1,0 +1,506 @@
+/* ── Terminal panel ───────────────────────────────────────────────
+   Docked at the bottom of the main column, sharing it with the editor:
+   `.editor-panel` is `flex: 1`, this pane is `flex-shrink: 0` with its
+   height set inline from the drag handle. Closed, the editor takes the
+   whole column, so there is no empty strip left behind.
+
+   The two panes are two halves of one window: same sheet colour, no
+   shadow, no slide-in, and the divider below is the only thing between
+   them. The pane used to be a dark floating slab over a light editor,
+   which fought both the xterm canvas (already theme-aware) and the
+   editor above it. */
+
+.terminal-panel {
+    position: relative;
+    z-index: 10;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    /* 毛玻璃 + 半透明 */
+    background: rgba(250, 250, 252, 0.82);
+    backdrop-filter: blur(16px) saturate(1.2);
+    -webkit-backdrop-filter: blur(16px) saturate(1.2);
+    /* 顶部圆角 */
+    border-radius: 14px 14px 0 0;
+    /* 浮起阴影 */
+    box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.10),
+                0 -2px 6px rgba(0, 0, 0, 0.06);
+    /* 顶部边框 */
+    border-top: 1px solid rgba(200, 211, 228, 0.6);
+    margin: 0 10px;
+    overflow: hidden;
+    user-select: none;
+}
+
+/* Minimised, not destroyed: the component stays mounted and every shell keeps
+   running, so this is `display: none` and nothing else. The flex column then
+   gives the whole height back to the editor. */
+.terminal-panel.hidden {
+    display: none;
+}
+
+/* With no tab open there is no `.editor-panel` above the pane, so the pane is
+   the whole column: `flex: 1` takes the main area outright instead of leaving
+   a docked 340px strip floating at the top of it. The inline `height` is not
+   emitted in this state either, so nothing can pin it back. Opening a file
+   drops `.solo`, restores the inline height, and the split returns. */
+.terminal-panel.solo {
+    flex: 1;
+}
+
+/* The way back from a minimised terminal. The pane starts open, so this can
+   only appear after the user has actually minimised it. */
+.terminal-restore {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex-shrink: 0;
+    height: 36px;
+    margin: 0 10px 10px 10px;
+    border-radius: 10px;
+    cursor: pointer;
+    user-select: none;
+    color: #4a5a72;
+    background: rgba(232, 236, 245, 0.8);
+    border: 1px solid rgba(200, 211, 228, 0.5);
+    font-size: calc(12px * var(--font-scale));
+    transition: all 0.18s ease;
+    backdrop-filter: blur(8px);
+}
+
+.terminal-restore:hover {
+    background: rgba(238, 242, 250, 0.95);
+    color: #172347;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+}
+
+.app-root.dark .terminal-restore {
+    background: rgba(22, 27, 34, 0.8);
+    border-color: rgba(33, 38, 45, 0.5);
+    color: #8b949e;
+}
+
+.app-root.dark .terminal-restore:hover {
+    background: rgba(31, 38, 48, 0.95);
+    color: #e5eaf6;
+}
+
+.terminal-restore-icon {
+    font-size: calc(13px * var(--font-scale));
+    line-height: 1;
+}
+
+/* The split line. Six pixels is thin but the whole drag works from the
+   pointer capture, not from staying inside it.
+
+   The hairline lives in a pseudo-element because `.terminal-panel` carries
+   no border: a border plus a centred rule would have put two lines 3px
+   apart, reading as a band rather than a divider. It is drawn by default —
+   the old divider was transparent, so the one thing worth seeing was the
+   one thing you could not. */
+.terminal-resize-handle {
+    position: relative;
+    flex-shrink: 0;
+    height: 10px;
+    cursor: ns-resize;
+    background: transparent;
+}
+
+.terminal-resize-handle::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 36px;
+    height: 3px;
+    background: rgba(180, 190, 210, 0.6);
+    border-radius: 3px;
+    transition: all 0.2s ease;
+}
+
+.terminal-resize-handle:hover::after {
+    width: 56px;
+    height: 4px;
+    background: #5b8cff;
+}
+
+.app-root.dark .terminal-resize-handle::after {
+    background: rgba(80, 90, 110, 0.6);
+}
+
+.app-root.dark .terminal-resize-handle:hover::after {
+    background: #58a6ff;
+}
+
+/* Set by the drag handler on <body> so the cursor and selection stay
+   suppressed even when the pointer leaves the handle. */
+body.term-dragging {
+    cursor: ns-resize;
+    user-select: none;
+}
+
+.app-root.dark .terminal-panel {
+    background: rgba(16, 20, 32, 0.78);
+    border-top-color: rgba(48, 54, 65, 0.6);
+    box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.25),
+                0 -2px 6px rgba(0, 0, 0, 0.15);
+}
+
+/* ── Terminal tabs ────────────────────────────────────────────── */
+
+/* Geometry and palette copied from `.editor-tab-bar` / `.editor-tab`: the
+   two bars stack in one column, so a 2px height difference or a second set
+   of greys is what made them read as two applications. */
+.terminal-tab-bar {
+    display: flex;
+    align-items: center;
+    height: 38px;
+    padding: 0 10px;
+    background: rgba(232, 236, 245, 0.55);
+    border-bottom: 1px solid rgba(200, 211, 228, 0.4);
+    flex-shrink: 0;
+    gap: 6px;
+}
+
+/* The scrolling half of the bar. Keeping the overflow here instead of on
+   `.terminal-tab-bar` is what stops the pane controls from scrolling away once
+   there are more tabs than fit. */
+.terminal-tabs {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+    gap: 2px;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.terminal-tabs::-webkit-scrollbar {
+    height: 3px;
+}
+
+.terminal-tabs::-webkit-scrollbar-thumb {
+    background: #c8d3e4;
+    border-radius: 2px;
+}
+
+.app-root.dark .terminal-tabs::-webkit-scrollbar-thumb {
+    background: #30363d;
+}
+
+.terminal-pane-controls {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    gap: 2px;
+    padding-left: 6px;
+    margin-left: 2px;
+    border-left: 1px solid #c8d3e4;
+}
+
+.app-root.dark .terminal-pane-controls {
+    border-left-color: #21262d;
+}
+
+.terminal-pane-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 22px;
+    background: transparent;
+    border: none;
+    color: #4a5a72;
+    font-size: calc(14px * var(--font-scale));
+    line-height: 1;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: color 0.12s, background 0.12s;
+}
+
+.terminal-pane-btn:hover {
+    color: #172347;
+    background: rgba(0,0,0,0.06);
+}
+
+/* Red only on hover: ending every session deserves a deliberate target.
+   Same two values as `.editor-tab-close:hover`, so a close is a close. */
+.terminal-pane-close:hover {
+    color: #f85149;
+    background: rgba(248,81,73,0.12);
+}
+
+.app-root.dark .terminal-pane-btn {
+    color: #8b949e;
+}
+
+.app-root.dark .terminal-pane-btn:hover {
+    color: #e6edf3;
+    background: rgba(255,255,255,0.08);
+}
+
+/* `.terminal-pane-close` carries both classes, so this has to be restated at
+   the dark rules' own specificity: otherwise `.dark .terminal-pane-btn:hover`
+   (0,4,0) beats `.terminal-pane-close:hover` (0,2,0) and the close stops
+   turning red in the dark theme. */
+.app-root.dark .terminal-pane-close:hover {
+    color: #f85149;
+    background: rgba(248,81,73,0.12);
+}
+
+.app-root.dark .terminal-tab-bar {
+    background: rgba(22, 27, 34, 0.45);
+    border-bottom-color: rgba(33, 38, 45, 0.4);
+}
+
+.terminal-tab {
+    display: flex;
+    align-items: center;
+    height: 28px;
+    padding: 0 14px;
+    font-size: calc(12px * var(--font-scale));
+    color: #6b7a99;
+    background: transparent;
+    border-radius: 10px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.18s ease;
+    flex-shrink: 0;
+    user-select: none;
+    gap: 6px;
+    border: 1px solid transparent;
+}
+
+.terminal-tab:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: #4a5a72;
+}
+
+.terminal-tab.active {
+    background: rgba(255, 255, 255, 0.92);
+    color: #172347;
+    border-color: rgba(200, 211, 228, 0.7);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.app-root.dark .terminal-tab {
+    color: #8b949e;
+}
+
+.app-root.dark .terminal-tab:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: #c6cdd5;
+}
+
+.app-root.dark .terminal-tab.active {
+    background: rgba(13, 17, 23, 0.9);
+    color: #e5eaf6;
+    border-color: rgba(48, 54, 61, 0.6);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+
+.terminal-tab-title {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.terminal-tab-close {
+    background: none;
+    border: none;
+    color: #8b949e;
+    font-size: calc(13px * var(--font-scale));
+    cursor: pointer;
+    padding: 0 2px;
+    border-radius: 2px;
+    line-height: 1;
+    transition: color 0.12s, background 0.12s;
+}
+
+.terminal-tab-close:hover {
+    color: #f85149;
+    background: rgba(248,81,73,0.12);
+}
+
+.terminal-tab-add {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: transparent;
+    border: 1px dashed rgba(150, 160, 180, 0.5);
+    color: #6b7a99;
+    font-size: calc(16px * var(--font-scale));
+    cursor: pointer;
+    border-radius: 10px;
+    flex-shrink: 0;
+    transition: all 0.18s ease;
+    margin-left: 4px;
+}
+
+.terminal-tab-add:hover {
+    color: #3b5bdb;
+    background: rgba(59, 91, 219, 0.1);
+    border-style: solid;
+    border-color: rgba(59, 91, 219, 0.4);
+}
+
+.app-root.dark .terminal-tab-add {
+    color: #8b949e;
+    border-color: rgba(100, 110, 130, 0.4);
+}
+
+.app-root.dark .terminal-tab-add:hover {
+    color: #58a6ff;
+    background: rgba(88, 166, 255, 0.12);
+    border-color: rgba(88, 166, 255, 0.4);
+}
+
+.terminal-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0;
+    position: relative;
+}
+
+.terminal-root {
+    position: absolute;
+    inset: 0;
+    padding: 12px 18px;
+    display: none;
+}
+
+/* xterm 画布背景透明，让毛玻璃效果透出来 */
+.terminal-root .xterm-screen {
+    background: transparent !important;
+}
+
+/* 光标样式 */
+.terminal-root .xterm-cursor-bar {
+    border-left-width: 2px;
+}
+
+.terminal-root.active {
+    display: block;
+}
+
+.terminal-root .xterm {
+    height: 100%;
+}
+
+.terminal-root .xterm-viewport {
+    scrollbar-color: #aebbd0 transparent;
+    scrollbar-width: thin;
+}
+
+.app-root.dark .terminal-root .xterm-viewport {
+    scrollbar-color: #30363d transparent;
+}
+
+.terminal-root .xterm-viewport::-webkit-scrollbar {
+    width: 8px;
+}
+
+.terminal-root .xterm-viewport::-webkit-scrollbar-thumb {
+    background: #aebbd0;
+    border: 2px solid transparent;
+    border-radius: 6px;
+    background-clip: padding-box;
+}
+
+.app-root.dark .terminal-root .xterm-viewport::-webkit-scrollbar-thumb {
+    background: #30363d;
+    background-clip: padding-box;
+}
+
+.terminal-error {
+    padding: 12px;
+    color: #c8394b;
+    font: 13px/1.5 Consolas, 'Courier New', monospace;
+    white-space: pre-wrap;
+    overflow: auto;
+}
+
+.app-root.dark .terminal-error {
+    color: #ff7b72;
+}
+
+/* ── Integrated workspace surface overrides ────────────────────── */
+
+.terminal-panel,
+.app-root.dark .terminal-panel {
+    margin: 0;
+    border: 0;
+    border-top: 1px solid var(--surface-border);
+    border-radius: 0;
+    background: var(--surface-raised);
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+.terminal-tab-bar,
+.app-root.dark .terminal-tab-bar {
+    height: 38px;
+    padding: 0 12px;
+    background: var(--surface-muted);
+    border-bottom-color: var(--surface-border);
+}
+
+.terminal-tab,
+.app-root.dark .terminal-tab {
+    position: relative;
+    height: 38px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 0;
+    color: var(--text-secondary);
+    background: transparent;
+    box-shadow: none;
+}
+
+.terminal-tab:hover,
+.app-root.dark .terminal-tab:hover {
+    color: var(--text-primary);
+    background: color-mix(in srgb, var(--surface-raised) 65%, transparent);
+}
+
+.terminal-tab.active,
+.app-root.dark .terminal-tab.active {
+    color: var(--text-primary);
+    background: var(--surface-raised);
+    box-shadow: inset 0 -2px #4c6ef5;
+}
+
+.terminal-pane-btn,
+.app-root.dark .terminal-pane-btn {
+    color: var(--text-secondary);
+}
+
+.terminal-pane-controls,
+.app-root.dark .terminal-pane-controls {
+    border-left-color: var(--surface-border);
+}
+
+.terminal-resize-handle {
+    height: 8px;
+    background: var(--surface-raised);
+}
+
+.terminal-resize-handle::after {
+    width: 32px;
+    height: 2px;
+    background: var(--surface-border);
+}
+
+.terminal-resize-handle:hover::after {
+    width: 48px;
+    height: 3px;
+}

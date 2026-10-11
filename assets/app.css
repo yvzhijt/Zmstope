@@ -1,0 +1,824 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* Every `font-size` below is written as `calc(<base>px * var(--font-scale))`,
+   so this one number is the whole UI's type scale. CodeMirror and xterm read it
+   too, which is why it lives here and not in each of the three stylesheets. */
+:root {
+    --font-scale: 1.25;
+}
+
+body {
+    font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    overflow: hidden;
+    height: 100vh;
+}
+
+.app-root {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    color: #172347;
+    background-color: #dce6f5;
+    transition: background-color 0.4s ease;
+}
+
+.app-root.dark {
+    color: #e5eaf6;
+    background-color: #080f27;
+}
+
+/* ── Top bar ────────────────────────────────────────────────── */
+
+.app-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 7px 14px;
+    background: #e6edf9;
+    border-bottom: 1px solid #c8d3e4;
+    flex-shrink: 0;
+}
+
+.app-root.dark .app-header {
+    background: #0d1533;
+    border-bottom-color: #21262d;
+}
+
+.app-brand {
+    font-size: calc(13px * var(--font-scale));
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    flex-shrink: 0;
+    background: linear-gradient(135deg, #3b5bdb, #7c5ce7, #e25a9f);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.app-root.dark .app-brand {
+    background: linear-gradient(135deg, #8ab4ff, #a78bfa, #f0a0c8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.app-workspace {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    /* Takes the slack so a long folder name is what gets clipped, not the
+       button on the right. */
+    flex: 1;
+    min-width: 0;
+}
+
+.app-workspace-label {
+    font-size: calc(11px * var(--font-scale));
+    color: #6b7a99;
+    flex-shrink: 0;
+}
+
+.app-root.dark .app-workspace-label {
+    color: #6e7a90;
+}
+
+.app-workspace-name {
+    font-size: calc(13px * var(--font-scale));
+    font-weight: 600;
+    color: #172347;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.app-root.dark .app-workspace-name {
+    color: #e5eaf6;
+}
+
+.app-workspace-name.is-empty {
+    font-weight: 400;
+    font-style: italic;
+    color: #8a94a8;
+}
+
+.header-btn {
+    flex-shrink: 0;
+    padding: 5px 12px;
+    background: #ffffff;
+    border: 1px solid #c8d3e4;
+    border-radius: 6px;
+    color: #172347;
+    font-family: inherit;
+    font-size: calc(12px * var(--font-scale));
+    cursor: pointer;
+}
+
+.header-btn:hover {
+    background: #eef2fa;
+    border-color: #9fb2d0;
+}
+
+.app-root.dark .header-btn {
+    background: #161b22;
+    border-color: #30363d;
+    color: #e5eaf6;
+}
+
+.app-root.dark .header-btn:hover {
+    background: #1f2630;
+    border-color: #484f58;
+}
+
+/* ── Workspace layout ──────────────────────────────────────────── */
+
+.workspace {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* ── File tree ─────────────────────────────────────────────────── */
+
+.file-tree {
+    width: 240px;
+    min-width: 200px;
+    max-width: 380px;
+    /* 毛玻璃 + 半透明，与编辑器、终端面板统一 */
+    background: rgba(240, 244, 250, 0.82);
+    backdrop-filter: blur(16px) saturate(1.2);
+    -webkit-backdrop-filter: blur(16px) saturate(1.2);
+    /* 圆角 */
+    border-radius: 14px;
+    /* 阴影 */
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08),
+                0 1px 3px rgba(0, 0, 0, 0.04);
+    /* 边框 */
+    border: 1px solid rgba(200, 211, 228, 0.5);
+    margin: 8px 0 8px 10px;
+    display: flex;
+    flex-direction: column;
+    user-select: none;
+    /* `resize: horizontal` needs a non-visible overflow, but only the body
+       should scroll — `auto` here would add a second scrollbar. */
+    resize: horizontal;
+    overflow: hidden;
+}
+
+.file-tree.dark {
+    background: rgba(13, 19, 33, 0.78);
+    border-color: rgba(48, 54, 65, 0.5);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.20),
+                0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.file-tree-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(200, 211, 228, 0.4);
+    font-size: calc(12px * var(--font-scale));
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    color: #4a5a72;
+    flex-shrink: 0;
+}
+
+.file-tree.dark .file-tree-header {
+    border-bottom-color: rgba(33, 38, 45, 0.4);
+    color: #8b949e;
+}
+
+/* The header is a path, not a label: it must not inherit the header's
+   tracking, and it must not push the refresh button off the edge.
+   `direction: rtl` is the left-ellipsis trick — it keeps the leaf folder on
+   screen when the path overflows — and the leading U+200E in the markup pins
+   the run to LTR so Windows' `\` and `?`, both bidi-neutral, cannot be
+   reordered on us. */
+.file-tree-path {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    direction: rtl;
+    text-align: left;
+    font-weight: 500;
+    letter-spacing: normal;
+}
+
+.file-tree-refresh {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: calc(14px * var(--font-scale));
+    line-height: 1;
+    padding: 4px 6px;
+    border-radius: 4px;
+    transition: background 0.15s;
+}
+
+.file-tree-refresh:hover {
+    background: rgba(0,0,0,0.06);
+}
+
+.file-tree.dark .file-tree-refresh:hover {
+    background: rgba(255,255,255,0.06);
+}
+
+.file-tree-body {
+    flex: 1;
+    overflow: auto;
+    padding: 4px 0;
+    font-size: calc(13px * var(--font-scale));
+}
+
+.file-tree-empty {
+    padding: 14px 12px;
+    color: #7a8699;
+    font-size: calc(12px * var(--font-scale));
+}
+
+.file-tree.dark .file-tree-empty {
+    color: #6e7681;
+}
+
+.file-tree-error {
+    padding: 8px 12px;
+    color: #c8394b;
+    font-size: calc(11px * var(--font-scale));
+    line-height: 1.45;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.file-tree.dark .file-tree-error {
+    color: #ff7b72;
+}
+
+.file-tree-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    /* Generous vertically: at 1.25x type a 5px pad gives a ~26px target, which
+       is below the ~32px that makes a tree row comfortable to hit. */
+    padding: 7px 8px;
+    cursor: pointer;
+    transition: background 0.12s;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.file-tree-row:hover {
+    background: rgba(76, 110, 245, 0.08);
+}
+
+.file-tree.dark .file-tree-row:hover {
+    background: rgba(88, 166, 255, 0.08);
+}
+
+.file-tree-icon {
+    /* Sized from the type scale so the icons grow with the 1.25x fonts, and
+       `flex` keeps the 16x16 svg centred on the text's baseline box. */
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    width: calc(15px * var(--font-scale));
+    height: calc(15px * var(--font-scale));
+}
+
+.file-tree-icon svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    /* Filled artwork, not the old stroked outline. Only paths the theme left
+       uncoloured (they carry `fill="currentColor"`) resolve here — an authored
+       brand colour such as Rust's `#ff7043` sits on the path itself and wins. */
+    fill: currentColor;
+    stroke: none;
+}
+
+.file-tree-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ── Main area ─────────────────────────────────────────────────── */
+
+.main-area {
+    position: relative;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* ── Toast ──────────────────────────────────────────────────────── */
+
+.toast {
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 40;
+    max-width: min(80%, 560px);
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: calc(13px * var(--font-scale));
+    line-height: 1.5;
+    color: #ffffff;
+    background: rgba(180, 35, 24, 0.94);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    cursor: pointer;
+    animation: toastFade 0.18s ease;
+    word-break: break-word;
+}
+
+@keyframes toastFade {
+    from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ── Editor panel ──────────────────────────────────────────────── */
+
+.editor-panel {
+    position: relative;
+    z-index: 5;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    /* 毛玻璃 + 半透明，与终端面板统一 */
+    background: rgba(250, 250, 252, 0.82);
+    backdrop-filter: blur(16px) saturate(1.2);
+    -webkit-backdrop-filter: blur(16px) saturate(1.2);
+    /* 圆角 */
+    border-radius: 14px;
+    /* 阴影 */
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08),
+                0 1px 3px rgba(0, 0, 0, 0.04);
+    /* 边框 */
+    border: 1px solid rgba(200, 211, 228, 0.5);
+    margin: 8px 10px 0 0;
+    overflow: hidden;
+}
+
+.app-root.dark .editor-panel {
+    background: rgba(16, 20, 32, 0.78);
+    border-color: rgba(48, 54, 65, 0.5);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.20),
+                0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.editor-tab-bar {
+    display: flex;
+    align-items: center;
+    height: 38px;
+    padding: 0 10px;
+    background: rgba(232, 236, 245, 0.55);
+    border-bottom: 1px solid rgba(200, 211, 228, 0.4);
+    flex-shrink: 0;
+    overflow-x: auto;
+    gap: 6px;
+}
+
+.app-root.dark .editor-tab-bar {
+    background: rgba(22, 27, 34, 0.45);
+    border-bottom-color: rgba(33, 38, 45, 0.4);
+}
+
+/* Same 3px rule as `.terminal-tabs`. Left alone, WebView draws a ~15px
+   scrollbar inside a fixed 32px bar and the 26px chips no longer fit, so
+   the row clips — and the two bars ended up with different scrollbars. */
+.editor-tab-bar::-webkit-scrollbar {
+    height: 3px;
+}
+
+.editor-tab-bar::-webkit-scrollbar-thumb {
+    background: #c8d3e4;
+    border-radius: 2px;
+}
+
+.app-root.dark .editor-tab-bar::-webkit-scrollbar-thumb {
+    background: #30363d;
+}
+
+.editor-tab {
+    display: flex;
+    align-items: center;
+    height: 28px;
+    padding: 0 14px;
+    font-size: calc(12px * var(--font-scale));
+    color: #6b7a99;
+    background: transparent;
+    border-radius: 10px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.18s ease;
+    flex-shrink: 0;
+    user-select: none;
+    gap: 6px;
+    border: 1px solid transparent;
+}
+
+.editor-tab:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: #4a5a72;
+}
+
+.editor-tab.active {
+    background: rgba(255, 255, 255, 0.92);
+    color: #172347;
+    border-color: rgba(200, 211, 228, 0.7);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.app-root.dark .editor-tab {
+    color: #8b949e;
+}
+
+.app-root.dark .editor-tab:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: #c6cdd5;
+}
+
+.app-root.dark .editor-tab.active {
+    background: rgba(13, 17, 23, 0.9);
+    color: #e5eaf6;
+    border-color: rgba(48, 54, 61, 0.6);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+
+.editor-tab-close {
+    background: none;
+    border: none;
+    color: #8b949e;
+    font-size: calc(14px * var(--font-scale));
+    cursor: pointer;
+    padding: 0 2px;
+    border-radius: 2px;
+    line-height: 1;
+    transition: color 0.12s, background 0.12s;
+}
+
+.editor-tab-close:hover {
+    color: #f85149;
+    background: rgba(248,81,73,0.12);
+}
+
+.editor-area {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+}
+
+/* CodeMirror overrides */
+.cm-editor {
+    height: 100%;
+}
+
+.cm-editor.cm-focused {
+    outline: none;
+}
+
+/* ── About ───────────────────────────────────────────────────── */
+
+.about-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(10, 14, 28, 0.55);
+    backdrop-filter: blur(4px);
+    animation: aboutFade 0.18s ease;
+}
+
+@keyframes aboutFade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Used by the About and confirm cards. It used to drive the terminal pane
+   too, but a docked pane must not slide in — least of all now that it
+   starts open on every launch. */
+@keyframes panelSlideUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.about-card {
+    width: min(90%, 420px);
+    padding: 24px 26px;
+    border-radius: 12px;
+    background: #f4f7ff;
+    color: #172347;
+    box-shadow: 0 18px 48px rgba(0,0,0,0.35);
+    user-select: none;
+    animation: panelSlideUp 0.2s cubic-bezier(0.22,0.78,0.2,1);
+}
+
+.app-root.dark .about-card {
+    background: #101827;
+    color: #e5eaf6;
+    border: 1px solid #21262d;
+}
+
+.about-title {
+    font-size: calc(18px * var(--font-scale));
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.about-version {
+    font-size: calc(12px * var(--font-scale));
+    opacity: 0.65;
+    margin-bottom: 12px;
+}
+
+.about-text {
+    font-size: calc(13px * var(--font-scale));
+    line-height: 1.6;
+    margin-bottom: 10px;
+}
+
+.about-list {
+    font-size: calc(12px * var(--font-scale));
+    line-height: 1.9;
+    opacity: 0.85;
+    padding-left: 18px;
+    margin-bottom: 18px;
+}
+
+.about-close {
+    width: 100%;
+    padding: 8px 0;
+    font-size: calc(13px * var(--font-scale));
+    color: #ffffff;
+    background: #4c6ef5;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.about-close:hover {
+    background: #3b5bdb;
+}
+
+/* ── Unsaved-changes prompt ──────────────────────────────────────
+   Lives inside `.editor-panel` rather than at the root, so it only
+   covers the editor it is about and the tab bar it hangs off. */
+
+.confirm-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(10, 14, 28, 0.55);
+    backdrop-filter: blur(4px);
+    animation: aboutFade 0.18s ease;
+}
+
+.confirm-card {
+    width: min(92%, 400px);
+    padding: 22px 24px;
+    border-radius: 12px;
+    background: #f4f7ff;
+    color: #172347;
+    box-shadow: 0 18px 48px rgba(0,0,0,0.35);
+    user-select: none;
+    animation: panelSlideUp 0.2s cubic-bezier(0.22,0.78,0.2,1);
+}
+
+.app-root.dark .confirm-card {
+    background: #101827;
+    color: #e5eaf6;
+    border: 1px solid #21262d;
+}
+
+.confirm-title {
+    font-size: calc(16px * var(--font-scale));
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.confirm-text {
+    font-size: calc(13px * var(--font-scale));
+    line-height: 1.7;
+    opacity: 0.85;
+    margin-bottom: 20px;
+}
+
+.confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.confirm-btn {
+    padding: 7px 15px;
+    font-size: calc(13px * var(--font-scale));
+    color: #172347;
+    background: #e8ecf5;
+    border: 1px solid #c8d3e4;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+}
+
+.confirm-btn:hover {
+    background: #dbe3f2;
+}
+
+.confirm-btn.primary {
+    color: #ffffff;
+    background: #4c6ef5;
+    border-color: #4c6ef5;
+}
+
+.confirm-btn.primary:hover {
+    background: #3b5bdb;
+}
+
+.app-root.dark .confirm-btn {
+    color: #e5eaf6;
+    background: #21262d;
+    border-color: #30363d;
+}
+
+.app-root.dark .confirm-btn:hover {
+    background: #292e36;
+}
+
+.app-root.dark .confirm-btn.primary {
+    color: #ffffff;
+    background: #4c6ef5;
+    border-color: #4c6ef5;
+}
+
+/* ── Integrated workspace surfaces ─────────────────────────────── */
+
+.app-root {
+    --surface: #f7f9fc;
+    --surface-raised: #ffffff;
+    --surface-muted: #eef2f8;
+    --surface-border: #d9e1ec;
+    --text-primary: #172347;
+    --text-secondary: #6b7a99;
+    background: var(--surface);
+}
+
+.app-root.dark {
+    --surface: #101722;
+    --surface-raised: #151e2b;
+    --surface-muted: #192331;
+    --surface-border: #293548;
+    --text-primary: #e5eaf6;
+    --text-secondary: #94a2b8;
+    background: var(--surface);
+}
+
+.app-header {
+    min-height: 42px;
+    padding: 6px 14px;
+    background: var(--surface-raised);
+    border-bottom-color: var(--surface-border);
+}
+
+.app-root.dark .app-header {
+    background: var(--surface-raised);
+    border-bottom-color: var(--surface-border);
+}
+
+.app-workspace-label,
+.app-root.dark .app-workspace-label {
+    color: var(--text-secondary);
+}
+
+.app-workspace-name,
+.app-root.dark .app-workspace-name {
+    color: var(--text-primary);
+}
+
+.header-btn {
+    background: var(--surface-raised);
+    border-color: var(--surface-border);
+}
+
+.app-root.dark .header-btn {
+    background: var(--surface-muted);
+    border-color: var(--surface-border);
+}
+
+.workspace {
+    min-height: 0;
+    background: var(--surface);
+}
+
+.file-tree,
+.file-tree.dark {
+    flex: 0 0 auto;
+    width: 240px;
+    min-width: 180px;
+    max-width: 420px;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    background: var(--surface-muted);
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    resize: none;
+}
+
+.workspace-resize-handle {
+    position: relative;
+    z-index: 2;
+    flex: 0 0 7px;
+    cursor: col-resize;
+    background: var(--surface-muted);
+    outline: none;
+}
+
+.workspace-resize-handle::after {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 3px;
+    width: 1px;
+    background: var(--surface-border);
+    transition: background 0.15s, width 0.15s, left 0.15s;
+}
+
+.workspace-resize-handle:hover::after,
+.workspace-resize-handle:focus-visible::after {
+    left: 2px;
+    width: 3px;
+    background: #5b8cff;
+}
+
+body.workspace-dragging {
+    cursor: col-resize;
+    user-select: none;
+}
+
+.file-tree-header,
+.file-tree.dark .file-tree-header {
+    min-height: 38px;
+    padding: 0 12px;
+    background: var(--surface-muted);
+    border-bottom-color: var(--surface-border);
+    color: var(--text-secondary);
+}
+
+.main-area {
+    min-width: 0;
+    background: var(--surface-raised);
+}
+
+.editor-panel,
+.app-root.dark .editor-panel {
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    background: var(--surface-raised);
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+.editor-tab-bar,
+.app-root.dark .editor-tab-bar {
+    height: 38px;
+    padding: 0 12px;
+    background: var(--surface-muted);
+    border-bottom-color: var(--surface-border);
+}
+
+.editor-tab,
+.app-root.dark .editor-tab {
+    position: relative;
+    height: 38px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 0;
+    color: var(--text-secondary);
+    background: transparent;
+    box-shadow: none;
+}
+
+.editor-tab:hover,
+.app-root.dark .editor-tab:hover {
+    color: var(--text-primary);
+    background: color-mix(in srgb, var(--surface-raised) 65%, transparent);
+}
+
+.editor-tab.active,
+.app-root.dark .editor-tab.active {
+    color: var(--text-primary);
+    background: var(--surface-raised);
+    box-shadow: inset 0 -2px #4c6ef5;
+}

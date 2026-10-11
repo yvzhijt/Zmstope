@@ -1,0 +1,24 @@
+[package]
+name = "desktop"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "desktop"
+path = "src/main.rs"
+
+[build-dependencies]
+embed-resource = "3"
+
+[dependencies]
+dioxus = { version = "0.5", features = ["desktop"] }
+dioxus-desktop = "0.5"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync"] }
+portable-pty = "0.8"
+image = "0.25"
+rfd = "0.17"
+
+
+
+
+

@@ -1,0 +1,16 @@
+/target
+stderr.log
+*.log
+.DS_Store
+
+# Dependencies
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
