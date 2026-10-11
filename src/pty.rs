@@ -644,7 +644,7 @@ const DROP_TERMINALS_JS: &str = include_str!("../assets/terminal/drop_terminals.
 fn console_error(desktop: &DesktopContext, message: &str) {
     let _ = desktop.webview.evaluate_script(&format!(
         "console.error('{}')",
-        crate::util::escape_js_string(&format!("[maid-atelier] {message}"))
+        crate::util::escape_js_string(&format!("[Zmstop] {message}"))
     ));
 }
 
