@@ -14,3 +14,8 @@ node_modules/
 
 # OS
 Thumbs.db
+
+# Rust build artifacts
+*.pdb
+*.exp
+*.lib

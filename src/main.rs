@@ -367,7 +367,7 @@ fn create_menu() -> Menu {
             &PredefinedMenuItem::separator(),
             &MenuItem::with_id("quit", "退出", true, acc("CmdOrCtrl+Q")),
         ])
-        .unwrap();
+        .expect("failed to build 文件 menu");
 
     let view_menu = Submenu::new("查看", true);
     view_menu
@@ -396,7 +396,7 @@ fn create_menu() -> Menu {
             &PredefinedMenuItem::separator(),
             &PredefinedMenuItem::fullscreen(Some("全屏")),
         ])
-        .unwrap();
+        .expect("failed to build 查看 menu");
 
     let window_menu = Submenu::new("窗口", true);
     window_menu
@@ -406,15 +406,15 @@ fn create_menu() -> Menu {
             &PredefinedMenuItem::separator(),
             &PredefinedMenuItem::close_window(Some("关闭窗口")),
         ])
-        .unwrap();
+        .expect("failed to build 窗口 menu");
 
     let help_menu = Submenu::new("帮助", true);
     help_menu
         .append_items(&[&MenuItem::with_id("about_help", "关于Zmstop", true, None)])
-        .unwrap();
+        .expect("failed to build 帮助 menu");
 
     menu.append_items(&[&file_menu, &view_menu, &window_menu, &help_menu])
-        .unwrap();
+        .expect("failed to build main menu bar");
 
     menu
 }
