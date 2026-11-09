@@ -324,8 +324,7 @@ struct Commands {
 }
 
 impl Commands {
-    /// Returns `false` for ids it does not own — notably `save`, which belongs
-    /// to the editor panel and is handled in `editor.rs`.
+    /// Returns `false` for ids it does not own.
     fn run(&mut self, id: &str) -> bool {
         match id {
             "quit" => {
@@ -359,8 +358,6 @@ fn create_menu() -> Menu {
     let file_menu = Submenu::new("文件", true);
     file_menu
         .append_items(&[
-            &MenuItem::with_id("save", "保存", true, acc("CmdOrCtrl+S")),
-            &PredefinedMenuItem::separator(),
             &MenuItem::with_id("open-folder", "打开文件夹…", true, acc("CmdOrCtrl+O")),
             &PredefinedMenuItem::separator(),
             &MenuItem::with_id("about", "关于桌面", true, None),

@@ -16,7 +16,7 @@
 use std::path::{Path, PathBuf};
 
 use dioxus::prelude::*;
-use dioxus_desktop::{use_muda_event_handler, use_window, DesktopContext};
+use dioxus_desktop::{use_window, DesktopContext};
 
 use crate::util::{base64_encode, escape_js_string};
 
@@ -330,20 +330,6 @@ pub fn EditorPanel(
                     }
                 }
             });
-        });
-    }
-
-    // 文件 → 保存. Handling it here keeps the path lookup local; `App` ignores
-    // the menu id. Kept alongside the webview route rather than replacing it:
-    // macOS and Linux translate menu accelerators natively, so this one is the
-    // working path there, while Windows only ever reaches us from a click.
-    {
-        let desktop = desktop.clone();
-        let active_tab = active_tab;
-        use_muda_event_handler(move |event| {
-            if event.id.0.as_str() == "save" {
-                save_active_tab(tabs, active_tab, &desktop, notice);
-            }
         });
     }
 
